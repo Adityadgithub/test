@@ -1,0 +1,714 @@
+import 'dart:convert';
+import 'package:dob_input_field/dob_input_field.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:get_hired/Login.dart';
+import 'package:get_hired/controller/app_data_controller.dart';
+import 'package:get_hired/homepage/Homepage.dart';
+import 'package:get_hired/homepage/MyProfile.dart';
+import 'package:get_hired/main.dart';
+import 'package:intl/intl.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:loading_animations/loading_animations.dart';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:location/location.dart';
+import 'package:multi_select_flutter/dialog/mult_select_dialog.dart';
+import 'package:multi_select_flutter/dialog/multi_select_dialog_field.dart';
+import 'package:multi_select_flutter/util/multi_select_item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'getLocation.dart';
+
+TextStyle headingTextStyle = const TextStyle(color: Colors.grey);
+
+enum SingingCharacter { Male, Female }
+
+class ProfileScreen extends StatefulWidget {
+  ProfileScreen({
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Map profilelist= Map();
+  
+  String? onlynumber;
+  Future<void> profile(email,gender,DOB,mobile_number,experience_level,work_experience,designation,education,skills) async {
+    try {
+
+      var headers = {
+        'Content-Type': 'application/json',
+        'Authorization':'$globalusertoken'
+
+    };
+      var request = http.Request('POST', Uri.parse('http://192.168.1.11/php-jwt-2/v1/profile-api.php'));
+      request.body = json.encode({
+        "email": email,
+        "gender": gender,
+        "DOB": DOB,
+        "mobile_number": mobile_number,
+        "experience_level": experience_level,
+        "work_experience": work_experience,
+        "designation": designation,
+        "education": education,
+        "skills": skills
+      });
+
+      request.headers.addAll(headers);
+
+      http.StreamedResponse response = await request.send();
+      print({email,gender,DOB,mobile_number,experience_level,work_experience,designation,education,skills});
+      print(await response.stream.bytesToString());
+
+      var data = await response.stream.bytesToString();
+      profilelist = jsonDecode(data);
+      print(profilelist);
+      if (response.statusCode == 200) {
+
+
+        if(profilelist['status']==1||profilelist['status']==0){
+          print('hhhhhhhhh');
+          Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder : (context) => Homepage(),
+              ));
+        }
+      }
+      else {
+        print(response.reasonPhrase);
+      }
+
+
+    } catch (e) {
+      print("catch $e");
+    }
+  }
+  String _radioValue = "male";
+
+  void _handleRadioValueChange(String? value) {
+    setState(() {
+      _radioValue = value!;
+    });
+  }
+
+  late String getData;
+  Map getList = Map();
+  var url = 'https://thenirmanstore.com/';
+  SingingCharacter? _character = SingingCharacter.Male;
+  TextEditingController dateInput = TextEditingController();
+
+  bool apicalled = false;
+
+  String? numbererror;
+
+  var EducationList = [
+    'M.A',
+    'M.B.A',
+    'M.Sc',
+    'M.E/M.Tech',
+    'B.Arch',
+    'B.A',
+    'B.B',
+    'B.B.A',
+    'B.S.B',
+    'B.C.L',
+    'B.C.S.',
+    'B.S.C.S.',
+    'B.C.J',
+    'B.S.C.J',
+    'B.Ed',
+    'B.E./B.Tech',
+    'LL.B',
+    'B.Pharm',
+    'B.Sc',
+    'Diploma',
+    'Other'
+  ];
+
+  var items = [
+    'Fresher',
+    'Intermediate',
+    'Experienced',
+  ];
+  var option;
+  var _value;
+  _getKey(stored) async {
+    print('running');
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.get('token');
+    setState(() {
+      stored = key;
+      globalusertoken = key;
+
+    });
+    print('YOUR get KEY - "$key"');
+  }
+  getKey(stored) async {
+    print('running');
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.get('email');
+    setState(() {
+      stored = key;
+
+      globaluserEmail= key;
+    });
+    print('YOUR Get KEY - "$key , $globaluserEmail"');
+  }
+  @override
+  void initState() {
+    _getKey(globalusertoken);
+    getKey(globaluserEmail);
+    print(" email is $globaluserEmail");
+
+    print(globalusertoken);
+
+    super.initState();
+  }
+
+  String? experience;
+  String? designation;
+  final AppDataController controller = Get.put(AppDataController());
+  @override
+  Widget build(BuildContext context) {
+    List SkillData = [];
+    List SkillName = [];
+
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      controller.getSkillData();
+    });
+    GlobalKey<FormState> _formkey = GlobalKey<FormState>();
+    String dropdownvalue = items.first;
+    String Educationdropdownvalue = EducationList.first;
+
+    return getList['status'] != 1
+        ? Scaffold(
+            appBar: AppBar(
+                title: const Text(
+                  'My Profile',
+                  style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 22.5,
+                      fontWeight: FontWeight.bold),
+                ),
+                centerTitle: true,
+                leading: const SizedBox(),
+                backgroundColor: ThemeColor,
+                elevation: 0.5,
+                actions: [
+                  PopupMenuButton(
+                    icon: const Icon(
+                      Icons.more_vert,
+                      color: Colors.white,
+                    ),
+                    onSelected: (newValue) {
+                      if (newValue == 0) {
+                        Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => LoginPage()));
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        child: Text("Logout"),
+                        value: 0,
+                      ),
+                    ],
+                  )
+                ]),
+            body: SingleChildScrollView(
+              child: Form(key: _formkey,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Column(
+                            children: [
+                              const CircleAvatar(
+                                radius: 40,
+                                backgroundColor: Colors.white,
+                                child: Text(''),
+                                foregroundImage:
+                                    AssetImage('assets/images/Daco.png'),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            margin: const EdgeInsets.only(left: 20, bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 4),
+                                  child: const Text(
+                                    "Username",
+                                    style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                                const Text(
+                                  "example123@gamil.com",
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding:
+                          const EdgeInsets.only(left: 15, top: 10, right: 15),
+                      width: MediaQuery.of(context).size.width,
+                      //height: MediaQuery.of(context).size.height * .6165,
+                      decoration: const BoxDecoration(
+                          borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(15),
+                              topRight: Radius.circular(15)),
+              
+                          // borderRadius: BorderRadius(
+                          // topLeft: Radius.circular(60),
+                          // topRight: Radius.circular(60)),
+                          color: Colors.white),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          Center(
+                              child: Text(
+                            "Complete your Profile",
+                            style: TextStyle(fontSize: 18, color: ThemeColor),
+                          )),
+                          const SizedBox(
+                            height: 6,
+                          ),
+                          const Text(
+                            'My Gender',
+                            textAlign: TextAlign.start,
+                          ),
+                          Container(
+                            width: MediaQuery.of(context).size.width,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: MediaQuery.of(context).size.width/2.9,
+                                  child: ListTile(
+                                    title: const Text('Male'),
+                                    leading: Radio(
+                                      value: "male",
+                                      groupValue: _radioValue,
+                                      onChanged: _handleRadioValueChange,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: MediaQuery.of(context).size.width/2.5,
+                                  child: ListTile(
+                                    title: const Text('Female'),
+                                    leading: Radio(
+                                      value: "female",
+                                      groupValue: _radioValue,
+                                      onChanged: _handleRadioValueChange,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(),
+                          Text(
+                            "My Date of Birth",
+                            style: headingTextStyle,
+                          ),
+                          Container(
+                              child: TextFormField(
+              
+                                controller: dateInput,
+                                //editing controller of this TextField
+                                decoration: const InputDecoration(
+              
+                                    icon: Icon(
+                                        Icons.calendar_today), //icon of text field
+              
+                                    border: InputBorder.none //label text of field
+                                ),
+                                validator:(value){
+                                  if (value == null || value.isEmpty) {
+                                    return 'Please enter value';
+                                  }
+                                  return null;
+                                },
+              
+                                readOnly: true,
+              
+              
+                                onTap: () async {
+                                  DateTime? pickedDate = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.utc(1990),
+                                      firstDate: DateTime(1950),
+                                      //DateTime.now() - not to allow to choose before today.
+                                      lastDate: DateTime(2005));
+              
+                                  if (pickedDate != null) {
+                                    print(
+                                        pickedDate); //pickedDate output format => 2021-03-10 00:00:00.000
+                                    String formattedDate =
+                                    DateFormat('dd-MM-yyyy').format(pickedDate);
+                                    print(
+                                        formattedDate); //formatted date output using intl package =>  2021-03-16
+                                    setState(() {
+                                      dateInput.text =
+                                          formattedDate; //set output date to TextField value.
+                                    });
+                                  } else {}
+                                },
+                              )),
+                          const Divider(),
+                          Container(
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(5)),
+                              child: TextFormField(
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  contentPadding:
+                                  EdgeInsets.only(bottom: 10, top: 10),
+                                  labelText: 'Mobile Number',
+                                  labelStyle: headingTextStyle,
+                                ),
+                                initialValue: onlynumber,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return "Field can't be empty";
+                                  }
+                                  if (value!.contains(',')) {
+                                    return
+                                      "Invalid input. Please enter numbers only";
+                                  }
+                                  if (value.contains('.')) {
+                                    return
+                                      "Invalid input. Please enter numbers only";
+                                  }
+                                  if (value.contains('-')) {
+                                    return                                        "Invalid input. Please enter numbers only";
+                                  }
+                                  if (value.contains(' ')) {
+                                    return
+                                      "Invalid input. Please enter numbers only without any spaces";
+                                  }
+              
+                                  if (value.length < 10) {
+                                    return
+                                      "Please enter full 10 digit number";
+                                  }
+                                  return null;
+                                },
+                                onChanged: (value) {
+                                  setState(() {
+                                    onlynumber = value;
+                                    numbererror = null;
+                                  });
+                                },
+                              )),
+                          if (numbererror != null)
+                            Padding(
+                              padding:
+                              const EdgeInsets.only(top: 3, bottom: 10.0),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: MediaQuery.of(context).size.width,
+                                    padding: EdgeInsets.all(0),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                            width: MediaQuery.of(context)
+                                                .size
+                                                .width -
+                                                100,
+                                            child: Text(
+                                              "$numbererror",
+                                              style: TextStyle(
+                                                  color: Colors.red,
+                                                  fontSize: 13),
+                                            )),
+                                      ],
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                          const SizedBox(
+                            height: 8,
+                          ),
+                          const Divider(),
+                          if (option != items.first)
+                            TextFormField(
+                              validator: (value) {
+                                  if (value!.isEmpty||value==null) {
+                                    return
+                                      "Please enter your designation";
+                                  }
+                                  if (value!.length<5) {
+                                    return
+                                      "Please enter a valida designation";
+                                  }
+                              },
+                              onChanged: (value) {
+                                designation = value;
+                              },
+                              keyboardType: TextInputType.text,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                label: Text("Designation"),
+                                hintText: 'Java developer',
+                              ),
+                            ),
+                          Divider(),
+                          Text(
+                            "Experience Level",
+                            style: headingTextStyle,
+                          ),
+              
+                          DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                            ),
+                            icon: const Icon(Icons.keyboard_arrow_down),
+                            hint: const Text("Select Option"),
+                            isExpanded: true,
+                            validator: (value){
+                              return "Please select a value";
+                            },
+                            onChanged: (String? value) {
+                              option = value!;
+              
+                              setState(() {
+                                option;
+                              });
+                            },
+                            value: option,
+                            items: items
+                                .map<DropdownMenuItem<String>>((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(
+                                  value,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const Divider(),
+                          if (option != items.first && option != null) ...[
+                            TextFormField(
+                              keyboardType: TextInputType.number,
+              
+                              onChanged: (value) {
+                                experience = value;
+                              },
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                label: Text("Work Experiecnce in Years"),
+                                hintText: '2.5',
+                              ),
+                            ),
+              
+                            const Divider(),
+                          ],
+                          Text(
+                            "Education",
+                            style: headingTextStyle,
+                          ),
+                          DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                            ),
+                            icon: const Icon(Icons.keyboard_arrow_down),
+                            hint: const Text("Select Option"),
+                            isExpanded: true, validator: (value){
+                              return "Please select a value";
+                            },
+                            onChanged: (String? value) {
+                              _value = value!;
+              
+                              setState(() {
+                                _value;
+                              });
+                            },
+                            value: _value,
+                            items: EducationList.map<DropdownMenuItem<String>>(
+                                (String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(
+                                  value,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const Divider(),
+              
+              
+                          GetBuilder<AppDataController>(builder: (controller) {
+                            return MultiSelectDialogField(
+                              items: controller.dropDownData,
+                              title: const Text("Skills"),
+                              selectedColor: Colors.blue,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius:
+                                    const BorderRadius.all(Radius.circular(4)),
+                              ),
+                              searchable: true,
+                              buttonIcon: Icon(
+                                Icons.add,
+                                color: ThemeColor,
+                              ),
+                              buttonText: Text(
+                                "My Skills",
+                                style: headingTextStyle,
+                              ),
+                              onConfirm: (results) {
+                                SkillData.clear();
+                                SkillData = [];
+                                for (var i = 0; i < results.length; i++) {
+                                  var skill = results[i];
+                                  print(skill.id);
+                                  print(skill.name);
+                                  SkillData.add(skill.id);
+                                  SkillName.add(skill.name);
+                                }
+                                print("Skill $SkillData");
+                                print(SkillName);
+                              },
+                            );
+                          }),
+                          // MultiSelectDialogField(
+                          //   items: _items,
+                          //   title: const Text("Skills"),
+                          //   selectedColor: Colors.blue,
+                          //   onSelectionChanged: (value){
+                          //     _selectedSkill= value;
+                          //   },
+                          //   decoration: BoxDecoration(
+                          //     color: Colors.grey.withOpacity(0.1),
+                          //     borderRadius:
+                          //         const BorderRadius.all(Radius.circular(4)),
+                          //   ),
+                          //   searchable: true,
+                          //
+                          //   buttonIcon: Icon(
+                          //     Icons.add,
+                          //     color: ThemeColor,
+                          //   ),
+                          //   buttonText: Text(
+                          //     "My Skills",
+                          //     style: headingTextStyle,
+                          //   ),
+                          //
+                          //   onConfirm: (results) {
+                          //
+                          //     print(results);
+                          //   },
+                          //
+                          //   onSaved: (value){
+                          //   _selectedSkill = value!;
+                          //   print(_selectedSkill.);
+                          // },
+                          //   initialValue: _selectedSkill,
+                          //
+                          // ),
+                          Container(
+                            margin: const EdgeInsets.only(
+                                bottom: 40, top: 15, left: 10, right: 10),
+                            decoration: BoxDecoration(
+                                // color: Color.fromARGB(255, 255, 255, 18),
+              
+                                borderRadius: BorderRadius.circular(20)),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.only(
+                                          topLeft: Radius.circular(10),
+                                          bottomLeft: Radius.circular(10),
+                                          bottomRight: Radius.circular(10)))),
+                              onPressed: () {
+              
+                                // print("$_radioValue, ${dateInput.text.toString()} "
+                                //     "$onlynumber,$option, $experience ,$designation,$_value,$SkillName");
+                                if(_formkey.currentState!.validate()){profile(globaluserEmail,_radioValue, dateInput.text.toString() ,
+                                onlynumber,option, experience ,designation,_value,SkillName);}
+              
+                                // Navigator.push(
+                                //     context,
+                                //     MaterialPageRoute(
+                                //       builder: (context) => Homepage(),
+                                //     ));
+                              },
+                              child: const Text(
+                                'Done',
+                                style: TextStyle(fontSize: 18),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        : Scaffold(
+            body: SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    LoadingAnimationWidget.discreteCircle(
+                        color: Colors.blue.shade800, size: 80),
+                    const SizedBox(
+                      height: 15,
+                    ),
+                    const Text("Please wait")
+                  ],
+                ),
+              ),
+            ),
+          );
+  }
+// void _showMultiSelect(BuildContext context) async {
+//   await showDialog(
+//     context: context,
+//     builder: (ctx) {
+//       return  MultiSelectDialog(
+//         items: items,
+//         initialValue: items,
+//         onConfirm: (values) {
+//
+//         }
+//       );
+//     },
+//   );
+// }
+}
